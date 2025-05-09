@@ -22,9 +22,13 @@ class GameViewModel : ViewModel() {
     }
 
     fun restartGame() {
+        // First set to NOT_PLAYING to trigger the reset logic in GameView
         _gameState.value = GameStates.NOT_PLAYING
 
-        _gameState.value = GameStates.RUNNING
+        // Add a small delay to ensure reset happens before starting a new game
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            _gameState.value = GameStates.RUNNING
+        }, 50) // 50ms delay should be enough for the reset to complete
     }
 
     fun gameOver(score: Int) {

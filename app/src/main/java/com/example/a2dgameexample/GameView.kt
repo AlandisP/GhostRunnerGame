@@ -2,6 +2,7 @@ package com.example.a2dgameexample
 
 import android.app.GameState
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
@@ -13,6 +14,8 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.ui.unit.sp
 import androidx.core.util.Consumer
+import com.example.a2dgameexample.sprites.Character
+import com.example.a2dgameexample.sprites.Coin
 import java.util.Timer
 import kotlin.math.pow
 import kotlin.random.Random
@@ -28,16 +31,23 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var running = false
     private var onGameStateChanged: Consumer<GameStates>? = null
 
+    //speed
+    private var speed = 7
+
+
     //  Ball/Character Stuff
     private val paint = Paint().apply { color = Color.RED }
     private var x:Float  = 50f
     private var y: Float  = h.toFloat()
     private val floor: Float = h.toFloat()
-    private var radius = 20f;
+    private var radius = 30f;
     private var gravity:Float = 1.7f
     private var jump: Boolean = false
     private var jumpHeight = 30f
     private var velocity = jumpHeight
+    private var pixelChar: Character
+    private var charTics = 0
+    private var charAnimation = 0
 
     //Obstacle Stuff
     private var obstacleArea = 50f
@@ -51,8 +61,14 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private val paintCoin = Paint().apply{color = Color.YELLOW}
     private var coinX = w/2f + 100f
     private var coinY = h.toFloat()-30f
-    private var coinRadius = 10f
+    private var coinRadius = 30f
     private var coinGap = 75f
+    private var pixelCoin: Coin
+    private var coinTics = 0;
+    private var coinAnimation = 0;
+
+
+
 
     //Score
     private var score = 0;
@@ -64,8 +80,25 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     private var viewModel: GameViewModel? = null
 
+
+    private var scaledBitmap:Bitmap
+
     init {
         holder.addCallback(this)
+
+        // Load bitmap once with more efficient format
+        val options = BitmapFactory.Options().apply {
+            inPreferredConfig = Bitmap.Config.RGB_565 // Uses half the memory of default ARGB_8888
+        }
+        val bitmap = BitmapFactory.decodeResource(resources, R.drawable.newbackgroundtwo, options)
+        scaledBitmap = Bitmap.createScaledBitmap(bitmap, w, h, false)
+
+        // Free up the original bitmap memory
+        if (bitmap != scaledBitmap) {
+            bitmap.recycle()
+        }
+        pixelCoin = Coin(context)
+        pixelChar = Character(context)
     }
 
     fun setViewModel(vm: GameViewModel) {  // Set the view model.
@@ -172,6 +205,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 checkObstacleCollisions()
                 moveCoin()
                 collectedCoin()
+                updateCharAnimations()
                 if (y + radius >= floor) {
                     y = floor - radius
                 } else if (y < floor) {
@@ -221,39 +255,22 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     private fun checkObstacleCollisions() {
         //  Directly Over the obstacle(Left)
-//        if(x - radius <= obstacleLeft-obstacleVelocity && x + radius >= obstacleLeft+obstacleVelocity && y + radius >= obstacleTop) {
-//            viewModel?.gameOver(score)
-//        } else if(x - radius <= obstacleLeft-obstacleVelocity && x+radius >= obstacleRight-obstacleVelocity && y + radius <= obstacleTop && y + radius >= obstacleBottom) { //Within the obstacle
-//            viewModel?.gameOver(score)
-//        } else if(x + radius <= obstacleRight+obstacleVelocity && x - radius >= obstacleRight-obstacleVelocity && y - radius >= obstacleTop) {  //Right side(Over)
-//            viewModel?.gameOver(score)
-//        } else if(y+radius >= obstacleTop && x-radius >= obstacleLeft-obstacleVelocity && x+radius <= obstacleRight+obstacleVelocity) {
-//            viewModel?.gameOver(score)
-//        }
-
-        val circleOutsideRect = (x + radius < obstacleLeft) ||
-                (x - radius > obstacleRight) ||
-                (y + radius < obstacleTop) ||
-                (y - radius > obstacleBottom)
-
-        if (!circleOutsideRect) {
-            // Find the closest point on the rectangle to the circle center
-            val closestX = x.coerceIn(obstacleLeft, obstacleRight)
-            val closestY = y.coerceIn(obstacleTop, obstacleBottom)
-
-            // Calculate distance between closest point and circle center
-            val distanceX = x - closestX
-            val distanceY = y - closestY
-
-            // If this distance is less than or equal to the circle's radius, there's a collision
-            val distanceSquared = distanceX * distanceX + distanceY * distanceY
-
-            if (distanceSquared <= radius * radius) {
-                Log.d("Collision", "Obstacle collision detected at: x=$x, y=$y")
-                running = false
-                setGameState(GameStates.GAME_OVER)
-                viewModel?.gameOver(score)
-            }
+        if(x - radius <= obstacleLeft-obstacleVelocity && x + radius >= obstacleLeft+obstacleVelocity && y + radius >= obstacleTop) {
+            running = false
+            setGameState(GameStates.GAME_OVER)
+            viewModel?.gameOver(score)
+        } else if(x - radius <= obstacleLeft-obstacleVelocity && x+radius >= obstacleRight-obstacleVelocity && y + radius <= obstacleTop && y + radius >= obstacleBottom) { //Within the obstacle
+            running = false
+            setGameState(GameStates.GAME_OVER)
+            viewModel?.gameOver(score)
+        } else if(x + radius <= obstacleRight+obstacleVelocity && x - radius >= obstacleRight-obstacleVelocity && y - radius >= obstacleTop) {  //Right side(Over)
+            running = false
+            setGameState(GameStates.GAME_OVER)
+            viewModel?.gameOver(score)
+        } else if(y+radius >= obstacleTop && x-radius >= obstacleLeft-obstacleVelocity && x+radius <= obstacleRight+obstacleVelocity) {
+            running = false
+            setGameState(GameStates.GAME_OVER)
+            viewModel?.gameOver(score)
         }
     }
 
@@ -274,12 +291,37 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     }
 
+    private fun updateCharAnimations() {
+        charTics++
+        if(charTics == speed-6) {
+            if(charAnimation < 5) {
+                charAnimation++
+            } else {
+                charAnimation = 0
+            }
+        }
+        if(charTics > speed) {
+            charTics = 0
+        }
+    }
+
     private fun moveCoin() {
         coinX-=obstacleVelocity;
         if(coinX+coinRadius < -50f) {
             val randomY = Random.nextFloat()*(500f-h.toFloat())+h.toFloat()
-            coinX = w.toFloat() + 75f
+            coinX = w.toFloat() + 95f
             coinY = randomY
+        }
+        coinTics++
+        if (coinTics == speed) {
+            if(coinAnimation < 4) {
+                coinAnimation++
+            } else {
+                coinAnimation = 0
+            }
+        }
+        if(coinTics > speed) {
+            coinTics = 0
         }
     }
 
@@ -303,19 +345,29 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     private fun drawGame(canvas: Canvas) {
-        //canvas.drawBitmap(bitmap,0f, 0f, null)
-        canvas.drawColor(Color.BLACK)
+        canvas.drawBitmap(scaledBitmap,0f, 0f, null)
+
+        //canvas.drawColor(Color.TRANSPARENT)
         //Circle(Character)
         canvas.drawCircle(x.toFloat(), y.toFloat(), radius, paint)
+        if(gameState == GameStates.RUNNING) {
+            val pixelX = x - pixelChar.getRunBitmap(charAnimation).width/2f
+            val pixelY = (y+radius) - pixelChar.getRunBitmap(charAnimation).height
+            canvas.drawBitmap(pixelChar.getRunBitmap(charAnimation),pixelX,pixelY, null)
+        }
 
         //Rectangle(Obstacle(s))
         canvas.drawRect(obstacleLeft,obstacleTop,obstacleRight,obstacleBottom, Paint().apply { color = Color.BLUE })
         //canvas.drawCircle(300f, 100f, 20f, paint)
-        canvas.drawCircle(coinX, coinY, coinRadius, paintCoin)
+        //canvas.drawCircle(coinX, coinY, coinRadius, paintCoin)
         //Keeps Track of the Score
         canvas.drawText("${score}", w/2f, 100f, Paint().apply {
             textSize = 65f
             color = Color.WHITE })
+
+        canvas.drawBitmap(pixelCoin.getBitmap(coinAnimation), coinX, coinY, null)
+
+        Log.d("Dimensions", "height=$h, width=$w")
 
     }
 

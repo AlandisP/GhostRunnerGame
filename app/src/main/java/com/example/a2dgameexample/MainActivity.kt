@@ -1,5 +1,6 @@
 package com.example.a2dgameexample
 
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -32,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +70,12 @@ fun GameScreen(navController: NavController, viewModel: GameViewModel) {
     val lifecycleScope = rememberCoroutineScope()
     val finalScore by viewModel.finalScore.collectAsState()
     Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = R.drawable.fixedbackground),
+            contentDescription = "Background Image of Game",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
+        )
         AndroidView(
             factory = {
                 val view = GameView(it).apply {
