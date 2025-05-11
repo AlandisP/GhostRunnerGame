@@ -47,7 +47,11 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var velocity = jumpHeight
     private var pixelChar: Character
     private var charTics = 0
+    private var deathTics = 0
     private var charAnimation = 0
+    private var charJumpAnimation = 0
+    private var charDeathAnimation = 0
+    private var complete = false
 
     //Obstacle Stuff
     private var obstacleArea = 50f
@@ -56,19 +60,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var obstacleRight = (w/2f)+obstacleArea
     private var obstacleBottom = floor //This value should never change unless I want floating obstacles in later development.
     private var obstacleVelocity = 15f
+    private var collision = false
 
     // Coin(s)
     private val paintCoin = Paint().apply{color = Color.YELLOW}
-    private var coinX = w/2f + 100f
+    private var coinX = w/2f + 150f
     private var coinY = h.toFloat()-30f
     private var coinRadius = 30f
-    private var coinGap = 75f
     private var pixelCoin: Coin
     private var coinTics = 0;
     private var coinAnimation = 0;
-
-
-
 
     //Score
     private var score = 0;
@@ -174,6 +175,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         coinX = w / 2f + 100f
         coinY = h - 30f
         jump = false
+        collision = false
+        complete = false
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -213,6 +216,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                 }
                 //Jumping Mechanic
                 if (jump) {
+                    updateJumpAnimations()
                     //gravity = 0f
                     y -= velocity
                     velocity -= gravity
@@ -221,10 +225,17 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                         jump = false
                     }
                 }
-
-                Thread.sleep(16) // ~60 FPS
             }
+            if(collision) {
+                updateDeathAnimations()
+                if(complete) {
+                    setGameState(GameStates.GAME_OVER)
+                    viewModel?.gameOver(score)
+                }
+            }
+            Thread.sleep(16) // ~60 FPS
         }
+
     }
 
 
@@ -256,39 +267,50 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private fun checkObstacleCollisions() {
         //  Directly Over the obstacle(Left)
         if(x - radius <= obstacleLeft-obstacleVelocity && x + radius >= obstacleLeft+obstacleVelocity && y + radius >= obstacleTop) {
-            running = false
-            setGameState(GameStates.GAME_OVER)
-            viewModel?.gameOver(score)
+            handleCollisions()
         } else if(x - radius <= obstacleLeft-obstacleVelocity && x+radius >= obstacleRight-obstacleVelocity && y + radius <= obstacleTop && y + radius >= obstacleBottom) { //Within the obstacle
-            running = false
-            setGameState(GameStates.GAME_OVER)
-            viewModel?.gameOver(score)
+            handleCollisions()
         } else if(x + radius <= obstacleRight+obstacleVelocity && x - radius >= obstacleRight-obstacleVelocity && y - radius >= obstacleTop) {  //Right side(Over)
-            running = false
-            setGameState(GameStates.GAME_OVER)
-            viewModel?.gameOver(score)
+            handleCollisions()
         } else if(y+radius >= obstacleTop && x-radius >= obstacleLeft-obstacleVelocity && x+radius <= obstacleRight+obstacleVelocity) {
-            running = false
-            setGameState(GameStates.GAME_OVER)
-            viewModel?.gameOver(score)
+            handleCollisions()
+
         }
     }
 
-    private fun generateCoins(canvas: Canvas) {
-//        val randomFloat = Random.nextFloat()*(700-515)+515
-//        val randomNum = Random.nextInt()*(2-1)+1
-//
-//        if(randomNum == 1) {
-//            coinY = floor.toFloat()
-//        } else {
-//            coinY = Random.nextFloat()*(800-500)+500
-//        }
+    private fun handleCollisions() {
+        collision = true
 
-        canvas.drawCircle(coinX+coinGap, coinY, coinRadius, paintCoin)
-//        canvas.drawCircle(coinX+coinGap*2, coinY-60f, coinRadius, paintCoin)
-//        canvas.drawCircle(coinX+coinGap*3, coinY-60f, coinRadius, paintCoin)
-//        canvas.drawCircle(coinX+coinGap*4, coinY, coinRadius, paintCoin)
+    }
 
+
+    private fun updateJumpAnimations() {
+        charTics++
+        if(charTics == speed) {
+            if(charJumpAnimation < 7) {
+                charJumpAnimation++
+            } else {
+                charJumpAnimation = 0
+            }
+        }
+        if(charTics > speed) {
+            charTics = 0
+        }
+    }
+
+    private fun updateDeathAnimations() {
+        deathTics++
+        if(deathTics == speed) {
+            if(charDeathAnimation < 7) {
+                charDeathAnimation++
+            } else{
+                complete = true
+                charDeathAnimation = 0
+            }
+        }
+        if(deathTics > speed) {
+            deathTics = 0
+        }
     }
 
     private fun updateCharAnimations() {
@@ -345,34 +367,40 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     private fun drawGame(canvas: Canvas) {
+        val pixelX = x - pixelChar.getRunBitmap(charAnimation).width/2f
+        val pixelY = (y+radius) - pixelChar.getRunBitmap(charAnimation).height
         canvas.drawBitmap(scaledBitmap,0f, 0f, null)
 
         //canvas.drawColor(Color.TRANSPARENT)
         //Circle(Character)
         canvas.drawCircle(x.toFloat(), y.toFloat(), radius, paint)
         if(gameState == GameStates.RUNNING) {
-            val pixelX = x - pixelChar.getRunBitmap(charAnimation).width/2f
-            val pixelY = (y+radius) - pixelChar.getRunBitmap(charAnimation).height
-            canvas.drawBitmap(pixelChar.getRunBitmap(charAnimation),pixelX,pixelY, null)
+            if(jump) {
+                canvas.drawBitmap(pixelChar.getJumpBitmap(charJumpAnimation), pixelX, pixelY, null)
+            } else if(collision) {
+                canvas.drawBitmap(pixelChar.getDeathBitmap(charDeathAnimation), pixelX, pixelY, null)
+            }else {
+                canvas.drawBitmap(pixelChar.getRunBitmap(charAnimation), pixelX, pixelY, null)
+            }
         }
+
 
         //Rectangle(Obstacle(s))
         canvas.drawRect(obstacleLeft,obstacleTop,obstacleRight,obstacleBottom, Paint().apply { color = Color.BLUE })
-        //canvas.drawCircle(300f, 100f, 20f, paint)
+        //canvas.drawCircle(500f, 700f, 20f, paint)
         //canvas.drawCircle(coinX, coinY, coinRadius, paintCoin)
         //Keeps Track of the Score
         canvas.drawText("${score}", w/2f, 100f, Paint().apply {
             textSize = 65f
             color = Color.WHITE })
+        val pixelCoinX = coinX - pixelCoin.getBitmap(coinAnimation).width/2f
+        val pixelCoinY = (coinY+coinRadius) - pixelCoin.getBitmap(coinAnimation).height
 
-        canvas.drawBitmap(pixelCoin.getBitmap(coinAnimation), coinX, coinY, null)
+        canvas.drawBitmap(pixelCoin.getBitmap(coinAnimation), pixelCoinX, pixelCoinY, null)
 
         Log.d("Dimensions", "height=$h, width=$w")
 
     }
-
-
-
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 }
