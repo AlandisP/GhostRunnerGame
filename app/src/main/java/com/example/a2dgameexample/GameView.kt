@@ -65,9 +65,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
     // Coin(s)
     private val paintCoin = Paint().apply{color = Color.YELLOW}
-    private var coinX = w/2f + 150f
+    private var coinX =  w.toFloat()
     private var coinY = h.toFloat()-30f
-    private var coinRadius = 30f
+    private var coinRadius = 25f
     private var pixelCoin: Coin
     private var coinTics = 0;
     private var coinAnimation = 0;
@@ -176,7 +176,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         obX = 600f
         obY = floor
         score = 0
-        coinX = w / 2f + 100f
+        coinX = w.toFloat() + 200f
         coinY = h - 30f
         jump = false
         collision = false
@@ -344,12 +344,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
     }
 
+    private fun generateNewCoin() {
+        val randomY = Random.nextFloat()*(450f-h.toFloat()-coinRadius)+(h.toFloat()-coinRadius)
+        coinX = w.toFloat()+(Random.nextFloat()*(300f-10f)+10f)
+        coinY = randomY
+    }
+
     private fun moveCoin() {
         coinX-=obstacleVelocity;
-        if(coinX+coinRadius < -50f) {
-            val randomY = Random.nextFloat()*(400f-h.toFloat())+h.toFloat()
-            coinX = w.toFloat() + 95f
-            coinY = randomY
+        if(coinX+coinRadius < -100f) {
+            generateNewCoin()
         }
         coinTics++
         if (coinTics == speed) {
@@ -377,7 +381,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val sumOfRadiiSquared = (ballRadius + coinRadius).pow(2)
 
         if (distanceSquared <= sumOfRadiiSquared) {
-            coinX = -100f
+            generateNewCoin()
             Log.d("Collision", "Coin Hit (Air or Ground)")
             score++
         }
@@ -405,7 +409,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         //canvas.drawRect(obstacleLeft,obstacleTop,obstacleRight,obstacleBottom, Paint().apply { color =  Color.BLUE })
         canvas.drawBitmap(obType, obX, obY-obType.height, null)
         //canvas.drawCircle(500f, 700f, 20f, paint)
-        //canvas.drawCircle(coinX, coinY, coinRadius, paintCoin)
+        canvas.drawCircle(coinX, coinY, coinRadius, paintCoin)
         //Keeps Track of the Score
         canvas.drawText("${score}", w/2f, 100f, Paint().apply {
             textSize = 65f
@@ -415,7 +419,6 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
         canvas.drawBitmap(pixelCoin.getBitmap(coinAnimation), pixelCoinX, pixelCoinY, null)
 
-        Log.d("Dimensions", "height=$h, width=$w")
 
     }
 

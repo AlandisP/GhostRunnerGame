@@ -35,7 +35,7 @@ class Obstacle(context:Context) {
     }
 
     public fun getSpike(): Bitmap {
-        return getScaledBitmap(spike1, 4, 9)
+        return getScaledBitmap(spike1, 4, 8)
     }
 
     public fun getSpikeTwo(): Bitmap {
@@ -47,6 +47,6 @@ class Obstacle(context:Context) {
     }
 
     public fun getSign(): Bitmap {
-        return getScaledBitmap(sign, 7, 11)
+        return getScaledBitmap(sign, 6, 12)
     }
 }
