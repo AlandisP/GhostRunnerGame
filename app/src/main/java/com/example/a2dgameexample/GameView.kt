@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.util.Consumer
 import com.example.a2dgameexample.sprites.Character
 import com.example.a2dgameexample.sprites.Coin
+import com.example.a2dgameexample.sprites.Obstacle
 import java.util.Timer
 import kotlin.math.pow
 import kotlin.random.Random
@@ -47,6 +48,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var velocity = jumpHeight
     private var pixelChar: Character
     private var charTics = 0
+    private var jumpTics = 0
     private var deathTics = 0
     private var charAnimation = 0
     private var charJumpAnimation = 0
@@ -54,13 +56,12 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private var complete = false
 
     //Obstacle Stuff
-    private var obstacleArea = 50f
-    private var obstacleLeft = (w/2f)-obstacleArea
-    private var obstacleTop = 700f
-    private var obstacleRight = (w/2f)+obstacleArea
-    private var obstacleBottom = floor //This value should never change unless I want floating obstacles in later development.
     private var obstacleVelocity = 15f
     private var collision = false
+    private var obX = 600f
+    private var obY = floor
+    private var pixelObstacle: Obstacle
+    private var obType: Bitmap
 
     // Coin(s)
     private val paintCoin = Paint().apply{color = Color.YELLOW}
@@ -100,6 +101,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         }
         pixelCoin = Coin(context)
         pixelChar = Character(context)
+        pixelObstacle = Obstacle(context)
+        obType = pixelObstacle.getRock()
+        generateObstacle()
+
     }
 
     fun setViewModel(vm: GameViewModel) {  // Set the view model.
@@ -168,9 +173,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         x = 50f
         y = h.toFloat()
         velocity = jumpHeight
-        obstacleLeft = (w / 2f) - obstacleArea
-        obstacleRight = (w / 2f) + obstacleArea
-        obstacleTop = 700f
+        obX = 600f
+        obY = floor
         score = 0
         coinX = w / 2f + 100f
         coinY = h - 30f
@@ -205,7 +209,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
                     holder.unlockCanvasAndPost(it)
                 }
                 moveObstacle()
-                checkObstacleCollisions()
+                checkObstacleCollisions2()
                 moveCoin()
                 collectedCoin()
                 updateCharAnimations()
@@ -249,33 +253,46 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     }
 
     private fun moveObstacle() {
-        obstacleLeft-=obstacleVelocity
-        obstacleRight-=obstacleVelocity
-        if(obstacleRight < 0) {
+        obX-=obstacleVelocity
+        if(obX < 0-obType.width) {
             //Random Float
-            val randomFloat = Random.nextFloat()*(700-515)+515
-            val randomFloatArea = Random.nextFloat()*(50-10)+10
-            obstacleArea = randomFloatArea
-            obstacleLeft=w.toFloat()-randomFloatArea
-            obstacleRight=w.toFloat()+randomFloatArea
-            obstacleTop = randomFloat
-
+            generateObstacle()
+            obX=w.toFloat()
         }
 
     }
 
-    private fun checkObstacleCollisions() {
-        //  Directly Over the obstacle(Left)
-        if(x - radius <= obstacleLeft-obstacleVelocity && x + radius >= obstacleLeft+obstacleVelocity && y + radius >= obstacleTop) {
-            handleCollisions()
-        } else if(x - radius <= obstacleLeft-obstacleVelocity && x+radius >= obstacleRight-obstacleVelocity && y + radius <= obstacleTop && y + radius >= obstacleBottom) { //Within the obstacle
-            handleCollisions()
-        } else if(x + radius <= obstacleRight+obstacleVelocity && x - radius >= obstacleRight-obstacleVelocity && y - radius >= obstacleTop) {  //Right side(Over)
-            handleCollisions()
-        } else if(y+radius >= obstacleTop && x-radius >= obstacleLeft-obstacleVelocity && x+radius <= obstacleRight+obstacleVelocity) {
-            handleCollisions()
 
+    private fun checkObstacleCollisions2() {
+        val closestX = x.coerceIn(obX, obX + obType.width)
+        val closestY = y.coerceIn(obY, obY + obType.height)
+
+        // Calculate the distance between the circle's center and the closest point
+        val distanceX = x - closestX
+        val distanceY = y - closestY
+
+        val distance = distanceX * distanceX + distanceY * distanceY
+        val radiSquared = radius*radius
+        if(distance <= radiSquared) {
+            handleCollisions()
         }
+
+    }
+
+    private fun generateObstacle() {
+        val randomNum = Random.nextInt(6)
+        if (randomNum == 0) {
+            obType = pixelObstacle.getRock()
+        } else if(randomNum == 1) {
+            obType = pixelObstacle.getSign()
+        } else if(randomNum == 2) {
+            obType = pixelObstacle.getFlower()
+        } else if(randomNum == 3) {
+            obType = pixelObstacle.getSpike()
+        } else {
+            obType = pixelObstacle.getSpikeTwo()
+        }
+
     }
 
     private fun handleCollisions() {
@@ -285,16 +302,16 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
 
     private fun updateJumpAnimations() {
-        charTics++
-        if(charTics == speed) {
+        jumpTics++
+        if(jumpTics == speed) {
             if(charJumpAnimation < 7) {
                 charJumpAnimation++
             } else {
                 charJumpAnimation = 0
             }
         }
-        if(charTics > speed) {
-            charTics = 0
+        if(jumpTics > speed) {
+            jumpTics = 0
         }
     }
 
@@ -330,7 +347,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
     private fun moveCoin() {
         coinX-=obstacleVelocity;
         if(coinX+coinRadius < -50f) {
-            val randomY = Random.nextFloat()*(500f-h.toFloat())+h.toFloat()
+            val randomY = Random.nextFloat()*(400f-h.toFloat())+h.toFloat()
             coinX = w.toFloat() + 95f
             coinY = randomY
         }
@@ -371,9 +388,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
         val pixelY = (y+radius) - pixelChar.getRunBitmap(charAnimation).height
         canvas.drawBitmap(scaledBitmap,0f, 0f, null)
 
-        //canvas.drawColor(Color.TRANSPARENT)
         //Circle(Character)
-        canvas.drawCircle(x.toFloat(), y.toFloat(), radius, paint)
+        //canvas.drawCircle(x.toFloat(), y.toFloat(), radius, paint)
         if(gameState == GameStates.RUNNING) {
             if(jump) {
                 canvas.drawBitmap(pixelChar.getJumpBitmap(charJumpAnimation), pixelX, pixelY, null)
@@ -386,7 +402,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback,
 
 
         //Rectangle(Obstacle(s))
-        canvas.drawRect(obstacleLeft,obstacleTop,obstacleRight,obstacleBottom, Paint().apply { color = Color.BLUE })
+        //canvas.drawRect(obstacleLeft,obstacleTop,obstacleRight,obstacleBottom, Paint().apply { color =  Color.BLUE })
+        canvas.drawBitmap(obType, obX, obY-obType.height, null)
         //canvas.drawCircle(500f, 700f, 20f, paint)
         //canvas.drawCircle(coinX, coinY, coinRadius, paintCoin)
         //Keeps Track of the Score
